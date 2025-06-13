@@ -141,25 +141,16 @@ Open your browser and go to `http://127.0.0.1:8000/`
 
 1. **API Key Not Loading**
 
-1. **Symptom**: Error showing "OPENAI_API_KEY is not set in settings"
-2. **Cause**: `.env` file not found or improperly formatted
-3. **Solution**: Verify .env file is in the same directory as `manage.py` and contains `OPENAI_API_KEY=sk-your-key`
+  a. **Symptom**: Error showing "OPENAI_API_KEY is not set in settings"
+  b. **Cause**: `.env` file not found or improperly formatted
+  c. **Solution**: Verify .env file is in the same directory as `manage.py` and contains `OPENAI_API_KEY=sk-your-key
 
 
+2. **Rate Limit Errors**
 
-2. **Quota Exceeded Errors**
-
-1. **Symptom**: Error 429 with message about exceeding quota
-2. **Cause**: Reaching OpenAI API usage limits
-3. **Solution**: Check your OpenAI billing status at [https://platform.openai.com/account/billing](https://platform.openai.com/account/billing) and add credits
-
-
-
-3. **Rate Limit Errors**
-
-1. **Symptom**: Error 429 with message about rate limits
-2. **Cause**: Too many requests in a short time period
-3. **Solution**: Implement backoff strategy or use a paid tier with higher rate limits
+  a. **Symptom**: Error 429 with message about rate limits
+  b. **Cause**: Too many requests in a short time period
+  c. **Solution**: Implement backoff strategy or use a paid tier with higher rate limits
 
 
 ## 🔮 Future Enhancements
