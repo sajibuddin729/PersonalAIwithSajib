@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ material.title }} - AI Study Tool{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary me-3">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <div>
+                    <h1 class="mb-1">{{ material.title }}</h1>
+                    <div class="text-muted">
+                        {% if material.content_type == 'pdf' %}
+                            <i class="fas fa-file-pdf text-danger me-1"></i>PDF Document
+                        {% elif material.content_type == 'youtube' %}
+                            <i class="fab fa-youtube text-danger me-1"></i>YouTube Video
+                        {% else %}
+                            <i class="fas fa-file-text text-primary me-1"></i>Text Content
+                        {% endif %}
+                        • {{ material.created_at|date:"M d, Y" }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 mb-4">
+                {% if not flashcards and not quizzes %}
+                <a href="{% url 'generate_study_materials' material.pk %}" class="btn btn-primary">
+                    <i class="fas fa-magic me-1"></i>Generate Study Materials
+                </a>
+                {% endif %}
+                
+                {% if flashcards %}
+                <a href="{% url 'flashcards' material.pk %}" class="btn btn-success">
+                    <i class="fas fa-layer-group me-1"></i>View Flashcards ({{ flashcards.count }})
+                </a>
+                {% endif %}
+                
+                {% if quizzes %}
+                {% for quiz in quizzes %}
+                <a href="{% url 'quiz_detail' quiz.pk %}" class="btn btn-warning">
+                    <i class="fas fa-question-circle me-1"></i>Take Quiz
+                </a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Summary Section -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-compress-alt me-2"></i>Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if material.summary %}
+                        <div class="summary-content">
+                            {{ material.summary|linebreaks }}
+                        </div>
+                        
+                        <!-- Summary Chart -->
+                        <div class="mt-4">
+                            <h6>Key Terms Frequency</h6>
+                            <canvas id="summaryChart" width="400" height="200"></canvas>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Summary not available. Please try uploading the content again.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Q&A Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-comments me-2"></i>Ask Questions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Chat Messages -->
+                    <div class="chat-container mb-3" id="chatContainer">
+                        {% for message in chat_messages %}
+                        <div class="mb-3">
+                            <div class="bg-light p-3 rounded mb-2">
+                                <strong>Q:</strong> {{ message.question }}
+                            </div>
+                            <div class="bg-primary text-white p-3 rounded">
+                                <strong>A:</strong> {{ message.answer|linebreaks }}
+                            </div>
+                            <small class="text-muted">{{ message.created_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center">No questions asked yet. Start by asking something!</p>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Question Input -->
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="questionInput" 
+                               placeholder="Ask a question about this content...">
+                        <button class="btn btn-primary" type="button" id="askButton">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Stats -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Quick Stats</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="border-end">
+                                <h4 class="text-primary">{{ flashcards.count }}</h4>
+                                <small>Flashcards</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border-end">
+                                <h4 class="text-success">{{ quizzes.count }}</h4>
+                                <small>Quizzes</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-info">{{ chat_messages.count }}</h4>
+                            <small>Q&As</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Flashcards Preview -->
+            {% if flashcards %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Recent Flashcards</h6>
+                </div>
+                <div class="card-body">
+                    {% for flashcard in flashcards|slice:":3" %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <strong>Q:</strong> {{ flashcard.question|truncatechars:50 }}<br>
+                        <small class="text-muted">{{ flashcard.difficulty|title }}</small>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if flashcards.count > 3 %}
+                    <a href="{% url 'flashcards' material.pk %}" class="btn btn-sm btn-outline-primary w-100">
+                        View All Flashcards
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Content Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Content Information</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Type:</strong> {{ material.get_content_type_display }}</p>
+                    <p><strong>Created:</strong> {{ material.created_at|date:"M d, Y H:i" }}</p>
+                    {% if material.youtube_url %}
+                    <p><strong>Source:</strong> <a href="{{ material.youtube_url }}" target="_blank">YouTube Video</a></p>
+                    {% endif %}
+                    <p><strong>Content Length:</strong> ~{{ material.raw_content|length }} characters</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Q&A Functionality
+document.getElementById('askButton').addEventListener('click', askQuestion);
+document.getElementById('questionInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        askQuestion();
+    }
+});
+
+function askQuestion() {
+    const questionInput = document.getElementById('questionInput');
+    const question = questionInput.value.trim();
+    
+    if (!question) return;
+    
+    const askButton = document.getElementById('askButton');
+    const originalContent = askButton.innerHTML;
+    
+    // Show loading state
+    askButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    askButton.disabled = true;
+    questionInput.disabled = true;
+    
+    // Add question to chat immediately
+    addMessageToChat(question, null, true);
+    questionInput.value = '';
+    
+    // Send request
+    fetch(`/material/{{ material.pk }}/ask/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ question: question })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update the last message with the answer
+        updateLastMessage(data.answer, data.timestamp);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateLastMessage('Sorry, there was an error processing your question. Please try again.', new Date().toLocaleString());
+    })
+    .finally(() => {
+        // Reset button state
+        askButton.innerHTML = originalContent;
+        askButton.disabled = false;
+        questionInput.disabled = false;
+        questionInput.focus();
+    });
+}
+
+function addMessageToChat(question, answer, isLoading = false) {
+    const chatContainer = document.getElementById('chatContainer');
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'mb-3 new-message';
+    
+    const loadingAnswer = isLoading ? '<i class="fas fa-spinner fa-spin"></i> Thinking...' : answer;
+    
+    messageDiv.innerHTML = `
+        <div class="bg-light p-3 rounded mb-2">
+            <strong>Q:</strong> ${question}
+        </div>
+        <div class="bg-primary text-white p-3 rounded answer-section">
+            <strong>A:</strong> ${loadingAnswer}
+        </div>
+        <small class="text-muted timestamp">${new Date().toLocaleString()}</small>
+    `;
+    
+    chatContainer.insertBefore(messageDiv, chatContainer.firstChild);
+    chatContainer.scrollTop = 0;
+}
+
+function updateLastMessage(answer, timestamp) {
+    const lastMessage = document.querySelector('.new-message');
+    if (lastMessage) {
+        const answerSection = lastMessage.querySelector('.answer-section');
+        const timestampSection = lastMessage.querySelector('.timestamp');
+        
+        answerSection.innerHTML = `<strong>A:</strong> ${answer.replace(/\n/g, '<br>')}`;
+        timestampSection.textContent = timestamp;
+        
+        lastMessage.classList.remove('new-message');
+    }
+}
+
+// Summary Chart
+{% if material.summary %}
+fetch(`/material/{{ material.pk }}/chart-data/`)
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('summaryChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Frequency',
+                    data: data.data,
+                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Error loading chart data:', error);
+        document.getElementById('summaryChart').style.display = 'none';
+    });
+{% endif %}
+</script>
+{% endblock %}

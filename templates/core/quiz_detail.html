@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+
+{% block title %}Quiz - {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{% url 'material_detail' material.pk %}" class="btn btn-outline-secondary me-3">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <div>
+                    <h1 class="mb-1">{{ quiz.title }}</h1>
+                    <p class="text-muted mb-0">{{ material.title }} • {{ questions|length }} questions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if questions %}
+    <!-- Quiz Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <span>Question <span id="currentQuestion">1</span> of {{ questions|length }}</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">Score: <span id="score">0</span>/{{ questions|length }}</span>
+                            <div class="progress" style="width: 200px; height: 8px;">
+                                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quiz Container -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card" id="quizCard">
+                <div class="card-body">
+                    <h5 class="card-title mb-4" id="questionText"></h5>
+                    
+                    <div id="optionsContainer" class="mb-4">
+                        <!-- Options will be populated by JavaScript -->
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-outline-secondary" id="prevBtn" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <button class="btn btn-primary" id="nextBtn" disabled>
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Explanation Card (hidden initially) -->
+            <div class="card mt-3" id="explanationCard" style="display: none;">
+                <div class="card-body">
+                    <h6 class="card-title text-success">
+                        <i class="fas fa-lightbulb me-1"></i>Explanation
+                    </h6>
+                    <p id="explanationText" class="mb-0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Modal -->
+    <div class="modal fade" id="resultsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Quiz Results</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">  data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="display-1 mb-3" id="scoreEmoji">🎉</div>
+                        <h3 id="scoreTitle">Great Job!</h3>
+                        <p class="lead" id="scoreText">You scored <span id="finalScore">0</span> out of {{ questions|length }}</p>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar" id="finalProgressBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="reviewContainer">
+                        <h5 class="mb-3">Review Your Answers</h5>
+                        <div id="reviewList">
+                            <!-- Review items will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="retakeBtn">Retake Quiz</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- No Questions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-question-circle fa-4x text-muted mb-3"></i>
+                <h3>No Quiz Questions Available</h3>
+                <p class="text-muted">Generate quiz questions from your study material first.</p>
+                <a href="{% url 'material_detail' material.pk %}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-1"></i>Go Back
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if questions %}
+<script>
+// Quiz data
+const questions = {{ questions|safe }};
+let currentIndex = 0;
+let userAnswers = [];
+let score = 0;
+let quizCompleted = false;
+
+// DOM elements
+const currentQuestionSpan = document.getElementById('currentQuestion');
+const progressBar = document.getElementById('progressBar');
+const scoreSpan = document.getElementById('score');
+const questionText = document.getElementById('questionText');
+const optionsContainer = document.getElementById('optionsContainer');
+const explanationCard = document.getElementById('explanationCard');
+const explanationText = document.getElementById('explanationText');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+// Initialize quiz
+function init() {
+    userAnswers = new Array(questions.length).fill(null);
+    updateQuestion();
+    updateProgress();
+    updateButtons();
+}
+
+// Update current question display
+function updateQuestion() {
+    if (questions.length === 0) return;
+    
+    const question = questions[currentIndex];
+    questionText.textContent = question.question;
+    
+    // Clear and populate options
+    optionsContainer.innerHTML = '';
+    
+    question.options.forEach((option, index) => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'form-check mb-2';
+        
+        const isSelected = userAnswers[currentIndex] === index;
+        const isCorrect = index === question.correct_answer;
+        const isAnswered = userAnswers[currentIndex] !== null;
+        
+        let optionClass = 'form-check-input';
+        let labelClass = 'form-check-label';
+        
+        if (isAnswered) {
+            if (isSelected && isCorrect) {
+                optionClass += ' border-success';
+                labelClass += ' text-success fw-bold';
+            } else if (isSelected && !isCorrect) {
+                optionClass += ' border-danger';
+                labelClass += ' text-danger';
+            } else if (isCorrect) {
+                optionClass += ' border-success';
+                labelClass += ' text-success fw-bold';
+            }
+        }
+        
+        optionDiv.innerHTML = `
+            <input class="form-check-input ${optionClass}" type="radio" 
+                   name="option" id="option${index}" value="${index}" 
+                   ${isSelected ? 'checked' : ''} ${isAnswered ? 'disabled' : ''}>
+            <label class="form-check-label ${labelClass}" for="option${index}">
+                ${option}
+                ${isAnswered && isCorrect ? '<i class="fas fa-check text-success ms-2"></i>' : ''}
+                ${isAnswered && isSelected && !isCorrect ? '<i class="fas fa-times text-danger ms-2"></i>' : ''}
+            </label>
+        `;
+        
+        optionsContainer.appendChild(optionDiv);
+        
+        // Add click event if not answered
+        if (!isAnswered) {
+            const radio = optionDiv.querySelector('input');
+            radio.addEventListener('change', function() {
+                selectAnswer(index);
+            });
+        }
+    });
+    
+    // Show explanation if answered
+    if (userAnswers[currentIndex] !== null && question.explanation) {
+        explanationText.textContent = question.explanation;
+        explanationCard.style.display = 'block';
+    } else {
+        explanationCard.style.display = 'none';
+    }
+}
+
+// Handle answer selection
+function selectAnswer(selectedIndex) {
+    if (userAnswers[currentIndex] !== null) return; // Already answered
+    
+    userAnswers[currentIndex] = selectedIndex;
+    const question = questions[currentIndex];
+    
+    if (selectedIndex === question.correct_answer) {
+        score++;
+        scoreSpan.textContent = score;
+    }
+    
+    // Update question display to show correct/incorrect
+    updateQuestion();
+    updateButtons();
+    
+    // Auto-advance after a short delay
+    setTimeout(() => {
+        if (currentIndex < questions.length - 1) {
+            nextQuestion();
+        } else {
+            completeQuiz();
+        }
+    }, 2000);
+}
+
+// Navigation functions
+function previousQuestion() {
+    if (currentIndex > 0) {
+        currentIndex--;
+        updateQuestion();
+        updateProgress();
+        updateButtons();
+    }
+}
+
+function nextQuestion() {
+    if (currentIndex < questions.length - 1) {
+        currentIndex++;
+        updateQuestion();
+        updateProgress();
+        updateButtons();
+    } else if (userAnswers.every(answer => answer !== null)) {
+        completeQuiz();
+    }
+}
+
+// Update progress
+function updateProgress() {
+    currentQuestionSpan.textContent = currentIndex + 1;
+    const progress = ((currentIndex + 1) / questions.length) * 100;
+    progressBar.style.width = progress + '%';
+}
+
+// Update button states
+function updateButtons() {
+    prevBtn.disabled = currentIndex === 0;
+    
+    if (currentIndex === questions.length - 1) {
+        nextBtn.textContent = 'Finish Quiz';
+        nextBtn.innerHTML = 'Finish Quiz <i class="fas fa-flag-checkered"></i>';
+        nextBtn.disabled = userAnswers[currentIndex] === null;
+    } else {
+        nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+        nextBtn.disabled = false;
+    }
+}
+
+// Complete quiz
+function completeQuiz() {
+    if (quizCompleted) return;
+    quizCompleted = true;
+    
+    // Calculate final score percentage
+    const percentage = Math.round((score / questions.length) * 100);
+    
+    // Update results modal
+    const scoreEmoji = document.getElementById('scoreEmoji');
+    const scoreTitle = document.getElementById('scoreTitle');
+    const scoreText = document.getElementById('scoreText');
+    const finalScore = document.getElementById('finalScore');
+    const finalProgressBar = document.getElementById('finalProgressBar');
+    const reviewList = document.getElementById('reviewList');
+    
+    // Set emoji and title based on score
+    if (percentage >= 90) {
+        scoreEmoji.textContent = '🏆';
+        scoreTitle.textContent = 'Excellent!';
+        finalProgressBar.className = 'progress-bar bg-success';
+    } else if (percentage >= 70) {
+        scoreEmoji.textContent = '🎉';
+        scoreTitle.textContent = 'Great Job!';
+        finalProgressBar.className = 'progress-bar bg-primary';
+    } else if (percentage >= 50) {
+        scoreEmoji.textContent = '👍';
+        scoreTitle.textContent = 'Good Effort!';
+        finalProgressBar.className = 'progress-bar bg-warning';
+    } else {
+        scoreEmoji.textContent = '📚';
+        scoreTitle.textContent = 'Keep Studying!';
+        finalProgressBar.className = 'progress-bar bg-danger';
+    }
+    
+    finalScore.textContent = score;
+    finalProgressBar.style.width = percentage + '%';
+    
+    // Populate review
+    reviewList.innerHTML = '';
+    questions.forEach((question, index) => {
+        const userAnswer = userAnswers[index];
+        const isCorrect = userAnswer === question.correct_answer;
+        
+        const reviewItem = document.createElement('div');
+        reviewItem.className = `border rounded p-3 mb-3 ${isCorrect ? 'border-success bg-light' : 'border-danger bg-light'}`;
+        
+        reviewItem.innerHTML = `
+            <div class="d-flex align-items-start">
+                <div class="me-3">
+                    <i class="fas ${isCorrect ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'} fa-lg"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="mb-2">Question ${index + 1}</h6>
+                    <p class="mb-2">${question.question}</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small class="text-muted">Your answer:</small><br>
+                            <span class="${isCorrect ? 'text-success' : 'text-danger'}">${question.options[userAnswer]}</span>
+                        </div>
+                        ${!isCorrect ? `
+                        <div class="col-md-6">
+                            <small class="text-muted">Correct answer:</small><br>
+                            <span class="text-success">${question.options[question.correct_answer]}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    ${question.explanation ? `
+                    <div class="mt-2">
+                        <small class="text-muted">Explanation:</small><br>
+                        <small>${question.explanation}</small>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        reviewList.appendChild(reviewItem);
+    });
+    
+    // Show results modal
+    const resultsModal = new bootstrap.Modal(document.getElementById('resultsModal'));
+    resultsModal.show();
+}
+
+// Retake quiz
+function retakeQuiz() {
+    currentIndex = 0;
+    userAnswers = new Array(questions.length).fill(null);
+    score = 0;
+    quizCompleted = false;
+    scoreSpan.textContent = '0';
+    
+    const resultsModal = bootstrap.Modal.getInstance(document.getElementById('resultsModal'));
+    resultsModal.hide();
+    
+    init();
+}
+
+// Event listeners
+prevBtn.addEventListener('click', previousQuestion);
+nextBtn.addEventListener('click', nextQuestion);
+document.getElementById('retakeBtn').addEventListener('click', retakeQuiz);
+
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {
+    if (quizCompleted) return;
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            previousQuestion();
+            break;
+        case 'ArrowRight':
+        case 'Enter':
+            e.preventDefault();
+            nextQuestion();
+            break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+            e.preventDefault();
+            const optionIndex = parseInt(e.key) - 1;
+            if (optionIndex < questions[currentIndex].options.length && userAnswers[currentIndex] === null) {
+                selectAnswer(optionIndex);
+            }
+            break;
+    }
+});
+
+// Initialize the quiz
+init();
+</script>
+{% endif %}
+{% endblock %}
