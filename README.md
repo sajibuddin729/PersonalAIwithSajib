@@ -1,6 +1,5 @@
 # PersonalAI
 
-![AI Study Tool Banner](/placeholder.svg?height=200&width=600)
 
 An AI-powered educational content processor that automatically generates summaries, flashcards, quizzes, and answers questions about your study materials.
 
